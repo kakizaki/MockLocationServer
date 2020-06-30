@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">Mock Location Server</string>
+
+    <string name="toast_need_developer_mode">開発者向けオプションを有効にして、仮の現在地情報アプリに設定してください</string>
+    <string name="toast_need_set_mocklocation_app">仮の現在地情報アプリに設定してください</string>
+    <string name="toast_failed_start_webserver">Webサーバーの起動に失敗しました</string>
+
+    <string name="notification_channel_name">サービス実行中</string>
+    <string name="notification_stop_service">サービスを終了する</string>
+
+
+</resources>

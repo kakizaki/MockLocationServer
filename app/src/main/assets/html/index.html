@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang='ja'>
+    <head>
+        <meta charset='UTF-8'>
+        <title>Mock Location テスト</title>
+<!--
+        <script type="text/javascript" src="js/ble.js"></script>
+-->
+        <script type="text/javascript">
+    // Google Map Apiを使用するために、Apiキーを設定してください 
+    // HACK Apiキーを設定していなくてもある程度は表示されるようです
+    var apiKey = "";
+    var apiErrors = [];
+
+    // google map 描画オブジェクト
+    var gMap = undefined;
+    var gMarker = undefined;
+    var gSearchMarker = undefined;
+
+    //
+    var formElements = {};
+
+function onLoad() {
+    // Google Map の初期化
+    (function() {
+        var urlParams = new URLSearchParams(location.search);
+        apiKey = urlParams.get("key");
+        if (apiKey === null || apiKey === undefined) {
+            apiKey = "";
+        }
+
+        formElements.lat = document.getElementById("latitude");
+        formElements.lng = document.getElementById("longitude");
+        formElements.alt = document.getElementById("altitude");
+        formElements.hacc = document.getElementById("haccuracy");
+        formElements.searchBox = document.getElementById("search_box");
+        formElements.map = document.getElementById("map");
+
+
+        var script = document.createElement("script");
+        script.type = "text/javascript";
+        script.onerror = onGoogleMapApiLoadError;
+        script.async = true;
+        script.defer = true;
+        script.src = "http://maps.google.com/maps/api/js?key=" + apiKey + "&callback=initMap&language=ja&region=JP";
+
+        document.getElementsByTagName("head")[0].appendChild(script);
+
+    })();
+}
+
+function onGoogleMapApiLoadError() {
+    var m = "Google Map Apiのロードに失敗しました";
+    apiErrors.push(m);
+    alert(m);
+}
+
+function initMap() {
+    console.log(arguments);
+    //var body = document.getElementById("body");
+
+    createGoogleMapInstances({ lat: 34.1234, lng: 134.1234 })
+}
+
+// 
+// https://developers.google.com/maps/documentation/javascript/events#auth-errors
+function gm_authFailure() {
+    var m = "APIキーの認証に失敗しました";
+    apiErrors.push(m);
+    alert(m);
+}
+
+function createGoogleMapInstances(center) {
+    if (gMap !== undefined) {
+        gMap.setCenter(center);
+        return;
+    }
+
+    var options = {
+        zoom: 6,
+        mapTypeId: google.maps.MapTypeId.ROADMAP,
+        center: center,
+        zoomControl: true,
+        mapTypeControl: true,
+        scaleControl: true,
+        streetViewControl: false,
+        rotateControl: false,
+        fullscreenControl: false,
+        disableDoubleClickZoom: true
+    };
+    gMap = new google.maps.Map(formElements.map, options);
+
+    // マップをダブルクリックした際に、その場所の位置情報を送信する
+    gMap.addListener("dblclick", function(e) {
+        console.log("map double click");
+        onDoubleClickMap(e.latLng);
+    });
+
+    // 検索 (言葉から位置情報を取得する)
+    // Geocoding は有料なので、コメント
+    // var searchInput = document.getElementById("search_box");
+    // searchInput.addEventListener("keypress", function(e) {
+    //     if (e.key === "Enter") {
+    //         var place = document.getElementById("search_box").value;
+    //         var geocoder = new google.maps.Geocoder();
+    //         geocoder.geocode({
+    //             address: place
+    //         }, function(results, status) {
+    //             if (status == google.maps.GeocoderStatus.OK) {
+    //                 var bounds = new google.maps.LatLngBounds();
+    //                 var latlng = results[0].geometry.location;
+    //                 bounds.extend(latlng);
+    //             }
+    //         });
+    //     }
+    // });
+    // gMap.controls[google.maps.ControlPosition.TOP_RIGHT].push(searchInput);
+  
+    // 簡易な検索 (緯度経度を入力して、その場所にマーカーを表示する)
+    var searchInput = formElements.searchBox;
+    searchInput.addEventListener("keypress", function(e) {
+        onKeyPressSearchText(e);
+    });
+    gMap.controls[google.maps.ControlPosition.TOP_RIGHT].push(searchInput);
+}
+
+
+
+
+
+
+// 検索テキストコントロールでエンターキーが押されたとき: 
+function onKeyPressSearchText(e) {
+    if (gMap === undefined) {
+        return;
+    }
+
+    if (e.key !== "Enter") {
+        return;
+    }
+
+    var place = formElements.searchBox.value;
+    place = place.replace(/[,]/g, ' ');
+    place = place.replace(/[\s]+/g, ' ');
+    var words = place.trim().split(' ');
+
+    var lat = undefined;
+    var lng = undefined;
+
+    for (var i = 0; i < words.length; ++i) {
+        if (words[i] == "") {
+            continue;
+        }
+
+        var f = parseFloat(words[i]);
+        if (f === NaN) {
+            continue;
+        }
+
+        if (lat === undefined) {
+            lat = f;
+        }
+        else if (lng === undefined) {
+            lng = f;
+            break;
+        }
+    }
+    if (lat === undefined || lng === undefined) {
+        // TODO: error
+        return;
+    }
+
+    var l = { lat: lat, lng: lng };
+    gMap.setCenter(l);
+    if (gSearchMarker === undefined) {
+        gSearchMarker = new google.maps.Marker({
+            position: l,
+            map: gMap
+        });
+    }
+    else {
+        gSearchMarker.setPosition(l);
+    }
+}
+
+// マップをダブルクリックされたとき: その場所の位置情報を送信する
+function onDoubleClickMap(l) {
+    formElements.lat.value = l.lat();
+    formElements.lng.value = l.lng();
+    
+    updateMarker(l.lat(), l.lng());
+
+    var o = tryCreateSendLocationBody();
+    if (o !== undefined) {
+        sendLocation(o);
+    }
+}
+
+// マーカーをドラッグされたとき:
+function onDragEndMarker(l) {
+    formElements.lat.value = l.lat();
+    formElements.lng.value = l.lng();
+
+    var o = tryCreateSendLocationBody();
+    if (o !== undefined) {
+        sendLocation(o);
+    }
+}
+
+// 送信ボタンをクリックされたとき: フォームに入力されている位置情報を送信する
+function onClickSendButton() {
+    var o = tryCreateSendLocationBody();
+    if (o !== undefined) {
+        updateMarker(o.latitude, o.longitude);
+        sendLocation(o);
+    }
+}
+
+function tryCreateSendLocationBody() {
+    var l = { 
+        latitude: Number(formElements.lat.value), 
+        longitude: Number(formElements.lng.value), 
+        altitude: Number(formElements.alt.value), 
+        haccuracy: Number(formElements.hacc.value) 
+    };
+
+    if (Number.isNaN(l.latitude)) { alert("緯度を数値に変換できません"); return undefined; }
+    if (Number.isNaN(l.longitude)) { alert("経度を数値に変換できません"); return undefined; }
+    if (Number.isNaN(l.altitude)) { alert("高度を数値に変換できません"); return undefined; }
+    if (Number.isNaN(l.haccuracy)) { alert("水平精度を数値に変換できません"); return undefined; }
+    return l;
+}
+
+// 位置情報を送信する
+function sendLocation(l) {
+    var url = 'api/location';
+
+    var req = new XMLHttpRequest();
+    req.onload = function() {
+        if (req.status !== 200) {
+            alert("失敗: ステータスコード200以外の値が返されました: " + req.status) 
+        }
+    };
+    req.onerror = function() {
+        alert("送信失敗") 
+    };
+
+    // HACk とりあえず、ブロッキングにしておく
+    req.open('POST', url, false);
+    req.setRequestHeader('Content-Cype', 'application/json;charset=UTF-8');
+
+    try {
+        req.send(JSON.stringify(l));
+    } catch (error) {
+        alert("送信失敗: " + error) 
+    }
+}
+
+// 送信位置のマーカーの表示場所を更新
+function updateMarker(lat, lng) {
+    var latLng = { lat: lat, lng: lng };
+ 
+    if (gMarker === undefined) {
+        // 検索のマーカーと区別するため、円で描画する
+        gMarker = new google.maps.Marker({
+            position: latLng,
+            map: gMap,
+            icon: {
+                path: google.maps.SymbolPath.CIRCLE,
+                scale: 8,
+                strokeColor: '#FF0000',
+                strokeOpacity: 0.8,
+                fillColor: '#FF0000',
+                fillOpacity: 0.3,
+                strokeWeight: 2,
+            },
+            draggable: true
+        });
+        gMarker.addListener("dragend", function(e) {
+            onDragEndMarker(e.latLng);
+        });
+    }
+    else {
+        gMarker.setPosition(latLng);
+    }
+}
+
+
+</script>
+
+<style>
+  body {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      margin: 0;
+      padding: 0;
+  }
+
+  div#form_container {
+    flex-grow: 0;
+
+    padding: 10px;
+  }
+
+
+  div#map_container {
+    flex-grow: 1;
+
+    position: relative;
+  }
+
+  div#map {
+    background: #a00;
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+  }
+
+  #search_box {
+      width: 300px;
+  }
+</style>
+</head>
+<body onload="onLoad()">
+<div id="form_container">
+    <div>
+    </div>
+
+    <div>
+        <label for="latitude">緯度</label>
+        <input type='text' id='latitude' placeholder='緯度' value="0" />
+        
+        <label for="longitude">経度</label>
+        <input type='text' id='longitude' placeholder='経度' value="0" />
+        
+        <label for="altitude">高度</label>
+        <input type='text' id='altitude' placeholder='高度' value="0" />
+        
+        <label for="haccuracy">水平精度</label>
+        <input type='text' id='haccuracy' placeholder='水平精度' value="0" />
+
+        <button id='write' onclick='onClickSendButton();'>送信</button>
+    </div>
+</div>
+
+<div id="map_container">
+    <input id="search_box" class="controls" type="text" />
+    <div id="map">
+    </div>
+</div>
+
+</body>
+</html>
