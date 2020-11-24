@@ -61,6 +61,9 @@ class LocationUpdateJob(val callback: LocationUpdateJobCallback) {
                 }
 
                 val isNewLocation = latestRequestDate != request.date
+                if (isNewLocation == false && request.location.repeatedlyUpdate == false) {
+                    continue;
+                }
                 latestRequestDate = request.date
 
                 // 更新
@@ -72,7 +75,7 @@ class LocationUpdateJob(val callback: LocationUpdateJobCallback) {
                     longitude = request.location.longitude
                     altitude = request.location.altitude
                     accuracy = request.location.haccuracy.toFloat()
-                    speed = 0f
+                    speed = if (isNewLocation) request.location.velocity.toFloat() else 0f
                     bearing = 0f
                     time = currentTime
                     elapsedRealtimeNanos = realtimeNanos

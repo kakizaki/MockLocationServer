@@ -4,5 +4,7 @@ enum class LocationJsonFields(val prop: String) {
     lat("latitude"),
     lng("longitude"),
     alt("altitude"),
-    hacc("haccuracy")
+    hacc("haccuracy"),
+    repeatedlyUpdate("repeatedlyUpdate"),
+    velocity("velocity")
 }

@@ -219,6 +219,13 @@ class MockLocationWebServer(private val context: Context, val port: Int) : NanoH
                 return valueWhenNotContains
         }
 
+        fun JSONObject.optBooleanWhenContains(s: String, valueWhenNotContains: Boolean): Boolean {
+            if (this.has(s))
+                return this.optBoolean(s)
+            else
+                return valueWhenNotContains
+        }
+
         /**
          * JSON 文字列を FakeLocation へ変換する
          */
@@ -235,12 +242,16 @@ class MockLocationWebServer(private val context: Context, val port: Int) : NanoH
                 // 以下は、フィールドがない場合は0にする (緯度、経度が指定されていれば良い)
                 val alt = o.optDoubleWhenContains(LocationJsonFields.alt.prop, 0.0)
                 val hacc = o.optDoubleWhenContains(LocationJsonFields.hacc.prop, 0.0)
+                val repeatedly = o.optBooleanWhenContains(LocationJsonFields.repeatedlyUpdate.prop, false)
+                val velocity = o.optDoubleWhenContains(LocationJsonFields.velocity.prop, 0.0)
 
                 val l = FakeLocation(
                     lat,
                     lng,
                     alt,
-                    hacc
+                    hacc,
+                    repeatedly,
+                    velocity
                 )
 
                 return l

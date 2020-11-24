@@ -19,7 +19,7 @@ class MockLocationSetter(val providers: List<String>) {
                 false,
                 false,
                 false,
-                false,
+                true,
                 false,
                 Criteria.POWER_LOW,
                 Criteria.ACCURACY_FINE

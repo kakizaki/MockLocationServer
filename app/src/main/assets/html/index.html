@@ -33,6 +33,8 @@ function onLoad() {
         formElements.lng = document.getElementById("longitude");
         formElements.alt = document.getElementById("altitude");
         formElements.hacc = document.getElementById("haccuracy");
+        formElements.velocity = document.getElementById("velocity");
+        formElements.repeat = document.getElementById("repeatedly-update");
         formElements.searchBox = document.getElementById("search_box");
         formElements.map = document.getElementById("map");
 
@@ -221,13 +223,16 @@ function tryCreateSendLocationBody() {
         latitude: Number(formElements.lat.value), 
         longitude: Number(formElements.lng.value), 
         altitude: Number(formElements.alt.value), 
-        haccuracy: Number(formElements.hacc.value) 
+        haccuracy: Number(formElements.hacc.value),
+        velocity: Number(formElements.velocity.value),
+        repeatedlyUpdate: formElements.repeat.checked
     };
 
     if (Number.isNaN(l.latitude)) { alert("緯度を数値に変換できません"); return undefined; }
     if (Number.isNaN(l.longitude)) { alert("経度を数値に変換できません"); return undefined; }
     if (Number.isNaN(l.altitude)) { alert("高度を数値に変換できません"); return undefined; }
     if (Number.isNaN(l.haccuracy)) { alert("水平精度を数値に変換できません"); return undefined; }
+    if (Number.isNaN(l.velocity)) { alert("速度を数値に変換できません"); return undefined; }
     return l;
 }
 
@@ -342,7 +347,17 @@ function updateMarker(lat, lng) {
         <label for="haccuracy">水平精度</label>
         <input type='text' id='haccuracy' placeholder='水平精度' value="0" />
 
+        <label for="velocity">速度</label>
+        <input type='text' id='velocity' placeholder='速度' value="1" />
+
+        <label for="repeatedly-update">毎秒セットする</label>
+        <input type='checkbox' id='repeatedly-update' value="false" />
+
+
         <button id='write' onclick='onClickSendButton();'>送信</button>
+    </div>
+    <div>
+       <p>※ 「毎秒セットする」を使用する場合、初回の更新のみ速度をセットします (初回以降の速度は 0)</p>
     </div>
 </div>
 
