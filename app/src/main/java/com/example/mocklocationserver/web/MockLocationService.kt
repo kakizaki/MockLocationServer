@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.location.Location
 import android.location.LocationManager
+import android.net.wifi.WifiInfo
 import android.os.Build
 import android.os.IBinder
 import android.widget.Toast
@@ -13,12 +14,13 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.example.mocklocationserver.web.mocklocation.MockLocationSetter
 import com.example.mocklocationserver.web.mocklocation.MockLocationUtility
+import kotlinx.coroutines.Dispatchers
 import java.sql.Date
 import java.text.SimpleDateFormat
 import java.time.ZoneId
 import java.util.*
 
-class MockLocationService : Service(), LocationUpdateJobCallback {
+class MockLocationService : Service(), LocationUpdateJobCallback, WifiStateUpdateJobCallback {
 
     companion object {
     }
@@ -28,6 +30,17 @@ class MockLocationService : Service(), LocationUpdateJobCallback {
     private var webServer: MockLocationWebServer? = null
 
     private var updateJob = LocationUpdateJob(this)
+
+    private var updateWifiStateJob = WifiStateUpdateJob(this, this)
+
+
+    private val lockInstance = Object()
+
+    private var currentLocation: Location? = null
+
+    private var currentWifiInfoResult: WifiInfoResult? = null
+
+
 
     private val mockLocation =
         MockLocationSetter(
@@ -51,6 +64,8 @@ class MockLocationService : Service(), LocationUpdateJobCallback {
         webServer?.stop()
 
         updateJob.dispose()
+
+        updateWifiStateJob.dispose()
 
         serviceNotification.disposeNotification(this)
 
@@ -104,9 +119,11 @@ class MockLocationService : Service(), LocationUpdateJobCallback {
 
                 webServer?.let {
                     updateJob.launch(it)
+                    updateWifiStateJob.launch()
                 }
 
-                serviceNotification.updateNotification_StopService(this, "serve to :8080")
+                val text = getNotificationText()
+                serviceNotification.updateNotification_StopService(this, text)
             }
         }
         return START_NOT_STICKY
@@ -115,6 +132,10 @@ class MockLocationService : Service(), LocationUpdateJobCallback {
 
     override fun setLocation(l: Location, isNewLocation: Boolean) {
         println("update mock location: ${l}")
+
+        synchronized(lockInstance) {
+            currentLocation = l
+        }
 
         val locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
         if (locationManager != null) {
@@ -127,16 +148,63 @@ class MockLocationService : Service(), LocationUpdateJobCallback {
                 return
             }
 
-            val date = Date(l.time)
-            val tf = SimpleDateFormat("yyyy-MM-dd hh:mm:ss Z")
-            serviceNotification.updateNotification_StopService(
-                this,
-                "serve to :8080 (${tf.format(date)} lat:${l.latitude} lng:${l.longitude} alt:${l.altitude} acc:${l.accuracy})"
-            )
+            val text = getNotificationText()
+            serviceNotification.updateNotification_StopService(this, text)
         }
     }
 
 
+    override fun setWifiState(w: WifiInfoResult) {
+        synchronized(lockInstance) {
+            currentWifiInfoResult = w
+        }
+
+        val text = getNotificationText()
+        serviceNotification.updateNotification_StopService(this, text)
+    }
+
+
+
+
+    fun getNotificationText(): String {
+        var _currentLocation: Location? = null
+        var _currentWifiInfoResult: WifiInfoResult? = null
+
+        synchronized(lockInstance) {
+            _currentLocation = currentLocation
+            _currentWifiInfoResult = currentWifiInfoResult
+        }
+
+        var locationText = ""
+        _currentLocation?.let {
+            val date = Date(it.time)
+            val tf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss Z")
+            locationText = " (${tf.format(date)} lat:${it.latitude} lng:${it.longitude} alt:${it.altitude} acc:${it.accuracy})"
+        }
+
+        if (_currentWifiInfoResult == null) {
+            return "serve to :8080. " + locationText
+        }
+
+        if (_currentWifiInfoResult?.isEnabled == false) {
+            return "wifi is Disabled. " + locationText
+        }
+
+        if (_currentWifiInfoResult?.info == null) {
+            return "wifi is Disconnected. " + locationText
+        }
+
+        val ip = _currentWifiInfoResult?.info?.ipAddress ?: 0
+        if (ip == 0) {
+            return "wifi is Disconnected. " + locationText
+        }
+
+        val i1 = ip and 0xff
+        val i2 = (ip ushr 8) and 0xff
+        val i3 = (ip ushr 16) and 0xff
+        val i4 = (ip ushr 24) and 0xff
+        return "serve to ${i1}.${i2}.${i3}.${i4}:8080. " + locationText
+    }
 }
 
 
