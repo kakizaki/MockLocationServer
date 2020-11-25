@@ -5,7 +5,12 @@ import com.example.mocklocationserver.web.dto.FakeLocation
 import com.example.mocklocationserver.web.dto.LocationJsonFields
 import com.example.mocklocationserver.web.dto.RequestFakeLocation
 import fi.iki.elonen.NanoHTTPD
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
 import org.json.JSONException
 import org.json.JSONObject
 import java.util.*
@@ -15,30 +20,18 @@ import java.util.*
  * web api のハンドル
  * assets/html ディレクトリにあるファイルを返す
  */
-class MockLocationWebServer(private val context: Context, val port: Int) : NanoHTTPD(port) {
+class MockLocationWebServer(private val context: Context, val port: Int, private val scope: CoroutineScope) : NanoHTTPD(port) {
 
     private val lockObject = Object()
 
-    private val notifyUpdate = Object()
-
-    // HACK コルーチンのキャンセルができてこちらの方が良いが、受信者が多になる場合はだめ
-    private val notifyChannel = Channel<Unit>(0)
-
     private var requestFakeLocation: RequestFakeLocation? =  null
+
+    private val _state = MutableStateFlow<RequestFakeLocation?>(null)
+    val state: StateFlow<RequestFakeLocation?> = _state;
 
 
     override fun stop() {
         super.stop()
-
-        try {
-            synchronized(notifyUpdate) {
-                notifyUpdate.notifyAll()
-            }
-        }
-        catch (e: Exception) {
-        }
-
-        notifyChannel.cancel()
     }
 
     override fun serve(session: IHTTPSession?): Response {
@@ -146,18 +139,16 @@ class MockLocationWebServer(private val context: Context, val port: Int) : NanoH
 
 
     private fun setLocation(l: FakeLocation) {
+        // HACK StateFlow.emit すればいいのでは。古いものは残していないし。
         println("setLocation: $l")
-        var d = Date()
+        val d = Date()
         synchronized(lockObject)  {
-            requestFakeLocation =
-                RequestFakeLocation(d, l)
+            requestFakeLocation = RequestFakeLocation(d, l)
         }
 
-        synchronized(notifyUpdate) {
-            notifyUpdate.notifyAll()
+        scope.launch(Dispatchers.Default) {
+            _state.emit(RequestFakeLocation(d, l))
         }
-
-        notifyChannel.offer(Unit)
     }
 
 
@@ -171,38 +162,12 @@ class MockLocationWebServer(private val context: Context, val port: Int) : NanoH
     /**
      * 新しい位置情報を受信するまで待機する
      */
-    fun waitNewLocation(date: Date?, timeout: Long): Boolean {
-        synchronized(lockObject) {
-            if (date != requestFakeLocation?.date) {
-                return true
-            }
-        }
-
-        var notified = false
-        synchronized(notifyUpdate) {
-            try {
-                notifyUpdate.wait(timeout)
-                notified = false
-            }
-            catch (e: InterruptedException) {
-                notified = true
-            }
-        }
-        return notified
-    }
-
-
-    /**
-     * 新しい位置情報を受信するまで待機する
-     * HACK withTimeoutOrNull などが使用でき便利だが、呼び出し側が複数になる場合、offer等によりブロックが解除されるのは1つのため、だめ
-     */
-    suspend fun waitChannel(date: Date?) {
+    fun waitChannel(date: Date?) {
         synchronized(lockObject) {
             if (date != requestFakeLocation?.date) {
                 return
             }
         }
-        notifyChannel.receive()
     }
 
 

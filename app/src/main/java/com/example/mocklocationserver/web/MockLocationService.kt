@@ -6,21 +6,23 @@ import android.content.Context
 import android.content.Intent
 import android.location.Location
 import android.location.LocationManager
-import android.net.wifi.WifiInfo
 import android.os.Build
 import android.os.IBinder
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.lifecycle.LifecycleService
+import androidx.lifecycle.lifecycleScope
 import com.example.mocklocationserver.web.mocklocation.MockLocationSetter
 import com.example.mocklocationserver.web.mocklocation.MockLocationUtility
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.combine
 import java.sql.Date
 import java.text.SimpleDateFormat
-import java.time.ZoneId
 import java.util.*
 
-class MockLocationService : Service(), LocationUpdateJobCallback, WifiStateUpdateJobCallback {
+class MockLocationService : LifecycleService() {
 
     companion object {
     }
@@ -29,17 +31,12 @@ class MockLocationService : Service(), LocationUpdateJobCallback, WifiStateUpdat
 
     private var webServer: MockLocationWebServer? = null
 
-    private var updateJob = LocationUpdateJob(this)
+    private var updateLocationJob = LocationUpdateJob()
 
-    private var updateWifiStateJob = WifiStateUpdateJob(this, this)
+    private var updateWifiStateJob = WifiStateUpdateJob(this)
 
 
-    private val lockInstance = Object()
-
-    private var currentLocation: Location? = null
-
-    private var currentWifiInfoResult: WifiInfoResult? = null
-
+    private var isReadyUpdateNotification = false
 
 
     private val mockLocation =
@@ -51,19 +48,29 @@ class MockLocationService : Service(), LocationUpdateJobCallback, WifiStateUpdat
         )
 
 
+    init {
+        lifecycleScope.launchWhenStarted {
+            launch { updateLocationJob.state.collect { result -> onUpdateLocation(result) } }
+            launch { updateWifiStateJob.state.collect { result -> onUpdateWifiState(result) } }
+        }
+    }
+
     override fun onCreate() {
         super.onCreate()
 
         serviceNotification.makeForegroundService(this)
     }
 
+
     override fun onDestroy() {
         super.onDestroy()
         println("onDestroy")
 
+        isReadyUpdateNotification = false
+
         webServer?.stop()
 
-        updateJob.dispose()
+        updateLocationJob.dispose()
 
         updateWifiStateJob.dispose()
 
@@ -76,19 +83,21 @@ class MockLocationService : Service(), LocationUpdateJobCallback, WifiStateUpdat
     }
 
 
-    override fun onBind(intent: Intent): IBinder {
-        TODO("Return the communication channel to the service.")
-    }
+//    override fun onBind(intent: Intent): IBinder {
+//        TODO("Return the communication channel to the service.")
+//    }
 
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        super.onStartCommand(intent, flags, startId)
+
         println("onStartCommand")
 
-        action@ when (intent?.action) {
+        when (intent?.action) {
             ServiceNotification.INTENT_ACTION_STOP -> {
                 stopSelf()
             }
-            else -> {
+            else -> run {
                 // check allow Mock Location Application
                 if (MockLocationUtility.isEnabledMockLocationApp(this) == false) {
                     try {
@@ -99,26 +108,25 @@ class MockLocationService : Service(), LocationUpdateJobCallback, WifiStateUpdat
                         Toast.makeText(this, R.string.toast_need_developer_mode, Toast.LENGTH_LONG).show()
                     }
                     stopSelf()
-                    return@action
+                    return@run
                 }
-
-                // TODO check Wifi has connected
 
                 //
                 try {
                     webServer?.stop()
-                    webServer = MockLocationWebServer(this, 8080).apply {
+                    webServer = MockLocationWebServer(this, 8080, lifecycleScope).apply {
                         start()
                     }
                 }
                 catch (e: Exception) {
                     Toast.makeText(this, R.string.toast_failed_start_webserver, Toast.LENGTH_LONG).show()
                     stopSelf()
-                    return@action
+                    return@run
                 }
 
+                isReadyUpdateNotification = true
                 webServer?.let {
-                    updateJob.launch(it)
+                    updateLocationJob.launch(it)
                     updateWifiStateJob.launch()
                 }
 
@@ -130,17 +138,19 @@ class MockLocationService : Service(), LocationUpdateJobCallback, WifiStateUpdat
     }
 
 
-    override fun setLocation(l: Location, isNewLocation: Boolean) {
-        println("update mock location: ${l}")
-
-        synchronized(lockInstance) {
-            currentLocation = l
+    fun onUpdateLocation(r: LocationUpdateJob.Result?) {
+        if (isReadyUpdateNotification == false) {
+            return
+        }
+        if (r == null) {
+            return
         }
 
+        println("update mock location: ${r.l}")
         val locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
         if (locationManager != null) {
             try {
-                mockLocation.set(l, locationManager)
+                mockLocation.set(r.l, locationManager)
             }
             catch (e: SecurityException) {
                 val s = getString(R.string.toast_need_set_mocklocation_app)
@@ -153,10 +163,12 @@ class MockLocationService : Service(), LocationUpdateJobCallback, WifiStateUpdat
         }
     }
 
-
-    override fun setWifiState(w: WifiInfoResult) {
-        synchronized(lockInstance) {
-            currentWifiInfoResult = w
+    private fun onUpdateWifiState(r: WifiStateUpdateJob.Result?) {
+        if (isReadyUpdateNotification == false) {
+            return
+        }
+        if (r == null) {
+            return
         }
 
         val text = getNotificationText()
@@ -167,34 +179,29 @@ class MockLocationService : Service(), LocationUpdateJobCallback, WifiStateUpdat
 
 
     fun getNotificationText(): String {
-        var _currentLocation: Location? = null
-        var _currentWifiInfoResult: WifiInfoResult? = null
-
-        synchronized(lockInstance) {
-            _currentLocation = currentLocation
-            _currentWifiInfoResult = currentWifiInfoResult
-        }
+        val location = updateLocationJob.state.value
+        val wifi = updateWifiStateJob.state.value
 
         var locationText = ""
-        _currentLocation?.let {
-            val date = Date(it.time)
-            val tf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss Z")
-            locationText = " (${tf.format(date)} lat:${it.latitude} lng:${it.longitude} alt:${it.altitude} acc:${it.accuracy})"
+        location?.let {
+            val date = Date(it.l.time)
+            val tf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss Z", Locale.getDefault())
+            locationText = " (${tf.format(date)} lat:${it.l.latitude} lng:${it.l.longitude} alt:${it.l.altitude} acc:${it.l.accuracy})"
         }
 
-        if (_currentWifiInfoResult == null) {
+        if (wifi == null) {
             return "serve to :8080. " + locationText
         }
 
-        if (_currentWifiInfoResult?.isEnabled == false) {
+        if (wifi.isEnabled == false) {
             return "wifi is Disabled. " + locationText
         }
 
-        if (_currentWifiInfoResult?.info == null) {
+        if (wifi.info == null) {
             return "wifi is Disconnected. " + locationText
         }
 
-        val ip = _currentWifiInfoResult?.info?.ipAddress ?: 0
+        val ip = wifi.info.ipAddress ?: 0
         if (ip == 0) {
             return "wifi is Disconnected. " + locationText
         }
