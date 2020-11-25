@@ -1,6 +1,12 @@
 <resources>
     <string name="app_name">Mock Location Server</string>
 
+    <string name="permission_dialog_title">パーミッション</string>
+    <string name="permission_dialog_message">
+アプリ情報を表示しますので、「権限」をタップし、各項目を許可してください。\n
++ 「位置情報」 … WiFi の情報を取得するために使用します\n
+    </string>
+
     <string name="toast_need_developer_mode">開発者向けオプションを有効にして、仮の現在地情報アプリに設定してください</string>
     <string name="toast_need_set_mocklocation_app">仮の現在地情報アプリに設定してください</string>
     <string name="toast_failed_start_webserver">Webサーバーの起動に失敗しました</string>
