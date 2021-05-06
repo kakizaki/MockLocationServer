@@ -10,7 +10,12 @@ import android.os.Bundle
 import android.provider.Settings
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
-import kotlinx.android.synthetic.main.activity_main.*
+import com.example.mocklocationserver.web.databinding.ActivityMainBinding
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
 
@@ -19,13 +24,16 @@ class MainActivity : AppCompatActivity() {
 
     }
 
+    lateinit var binding: ActivityMainBinding
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
+        binding = ActivityMainBinding.inflate(layoutInflater)
+        setContentView(binding.root)
 
-        start_service.setOnClickListener { startWebServer() }
-        stop_service.setOnClickListener { stopWebServer() }
+        binding.startService.setOnClickListener { startWebServer() }
+        binding.stopService.setOnClickListener { stopWebServer() }
     }
 
 
@@ -50,11 +58,11 @@ class MainActivity : AppCompatActivity() {
 
 
     fun checkLocationPermission() {
-        if (checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+        if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
             return
         }
 
-        if (shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_COARSE_LOCATION))  {
+        if (shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_FINE_LOCATION))  {
             // パーミッションの許可の際に "今後、表示しない" にチェックを付けた場合
             val alert = AlertDialog.Builder(this)
                 .setTitle(R.string.permission_dialog_title)
@@ -69,19 +77,19 @@ class MainActivity : AppCompatActivity() {
                 .show()
         }
         else {
-            requestPermissions(arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION), REQUESTCODE_PERMISSION_LOCATION)
+            requestPermissions(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), REQUESTCODE_PERMISSION_LOCATION)
         }
     }
 
 
     fun startWebServer() {
-        var i = Intent(this, MockLocationService::class.java)
+        val i = Intent(this, MockLocationService::class.java)
         startService(i)
     }
 
 
     fun stopWebServer() {
-        var i = Intent(this, MockLocationService::class.java)
+        val i = Intent(this, MockLocationService::class.java)
         stopService(i)
     }
 }
