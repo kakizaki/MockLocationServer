@@ -9,7 +9,10 @@ import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.provider.Settings
 import android.widget.Toast
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
+import androidx.core.content.ContextCompat
 import com.example.mocklocationserver.web.databinding.ActivityMainBinding
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.delay
@@ -19,12 +22,9 @@ import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
 
-    companion object {
-        val REQUESTCODE_PERMISSION_LOCATION = 1
-
-    }
-
     lateinit var binding: ActivityMainBinding
+
+    lateinit var requestPermissionLauncher: ActivityResultLauncher<String?>
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -34,6 +34,10 @@ class MainActivity : AppCompatActivity() {
 
         binding.startService.setOnClickListener { startWebServer() }
         binding.stopService.setOnClickListener { stopWebServer() }
+
+        requestPermissionLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
+            onCheckLocationPermission(isGranted)
+        }
     }
 
 
@@ -43,26 +47,21 @@ class MainActivity : AppCompatActivity() {
         checkLocationPermission()
     }
 
-
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<out String>,
-        grantResults: IntArray
-    ) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-
-        if (requestCode == REQUESTCODE_PERMISSION_LOCATION) {
-            checkLocationPermission()
+    fun checkLocationPermission() {
+        if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            onCheckLocationPermission(true)
+        } else {
+            onCheckLocationPermission(false)
         }
     }
 
-
-    fun checkLocationPermission() {
-        if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+    fun onCheckLocationPermission(isGranted: Boolean) {
+        if (isGranted) {
+            // 現状、とくにすることがない
             return
         }
 
-        if (shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_FINE_LOCATION))  {
+        if (shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_FINE_LOCATION)) {
             // パーミッションの許可の際に "今後、表示しない" にチェックを付けた場合
             val alert = AlertDialog.Builder(this)
                 .setTitle(R.string.permission_dialog_title)
@@ -75,10 +74,10 @@ class MainActivity : AppCompatActivity() {
                 }
                 .create()
                 .show()
+            return
         }
-        else {
-            requestPermissions(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), REQUESTCODE_PERMISSION_LOCATION)
-        }
+
+        requestPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
     }
 
 
