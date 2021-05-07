@@ -4,7 +4,12 @@
 
 android デバイスに仮の位置情報をセットするアプリケーションです。
 
-https://developer.android.com/reference/android/location/LocationManager#addTestProvider(java.lang.String,%20boolean,%20boolean,%20boolean,%20boolean,%20boolean,%20boolean,%20boolean,%20int,%20int)
+* https://developer.android.com/reference/android/location/LocationManager#addTestProvider(java.lang.String,%20boolean,%20boolean,%20boolean,%20boolean,%20boolean,%20boolean,%20boolean,%20int,%20int)
+* https://developers.google.com/android/reference/com/google/android/gms/location/FusedLocationProviderClient#setMockLocation(android.location.Location)
+* https://developers.google.com/android/reference/com/google/android/gms/location/FusedLocationProviderClient#public-taskvoid-setmockmode-boolean-ismockmode
+* https://github.com/jcraane/LocationProvider
+
+
 
 # 主な機能
 
@@ -96,7 +101,7 @@ curl 等、リクエストを送信することで位置情報を設定します
 {
   "latitude": 34.1234,
   "longitude": 134.1234,
-  "altitude: 1.0,
+  "altitude": 1.0,
   "haccuracy": 2.0
 }
 ```
