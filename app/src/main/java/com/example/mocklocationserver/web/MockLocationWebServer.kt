@@ -13,7 +13,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import org.json.JSONException
 import org.json.JSONObject
+import java.security.KeyStore
 import java.util.*
+import javax.net.ssl.KeyManagerFactory
 
 /**
  * Web サーバー
@@ -28,6 +30,21 @@ class MockLocationWebServer(private val context: Context, val port: Int, private
 
     private val _state = MutableStateFlow<RequestFakeLocation?>(null)
     val state: StateFlow<RequestFakeLocation?> = _state;
+
+
+    init {
+
+        // for https://
+//        val keystore = KeyStore.getInstance(KeyStore.getDefaultType())
+//        val stream = context.assets.open("keystore.bks")
+//        keystore.load(stream, "password".toCharArray())
+//
+//        val factory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm())
+//        factory.init(keystore, "password".toCharArray())
+//
+//        makeSecure(NanoHTTPD.makeSSLSocketFactory(keystore, factory), null)
+
+    }
 
 
     override fun stop() {

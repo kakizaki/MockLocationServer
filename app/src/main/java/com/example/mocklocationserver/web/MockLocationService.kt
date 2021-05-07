@@ -4,10 +4,8 @@ import android.app.*
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
-import android.location.Location
 import android.location.LocationManager
 import android.os.Build
-import android.os.IBinder
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -15,9 +13,12 @@ import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
 import com.example.mocklocationserver.web.mocklocation.MockLocationSetter
 import com.example.mocklocationserver.web.mocklocation.MockLocationUtility
+import com.google.android.gms.common.ConnectionResult
+import com.google.android.gms.common.GoogleApiAvailability
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationServices
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.flow.combine
 import java.sql.Date
 import java.text.SimpleDateFormat
 import java.util.*
@@ -27,9 +28,13 @@ class MockLocationService : LifecycleService() {
     companion object {
     }
 
+
     private val serviceNotification = ServiceNotification()
 
     private var webServer: MockLocationWebServer? = null
+
+    private lateinit var locationClient: FusedLocationProviderClient
+    private var isAvailableLocationClient = false
 
     private var updateLocationJob = LocationUpdateJob()
 
@@ -44,14 +49,19 @@ class MockLocationService : LifecycleService() {
             listOf(
                 LocationManager.GPS_PROVIDER,
                 LocationManager.NETWORK_PROVIDER
-            )
+            ),
+            listOf("fused")
         )
 
 
     init {
         lifecycleScope.launchWhenStarted {
-            launch { updateLocationJob.state.collect { result -> onUpdateLocation(result) } }
-            launch { updateWifiStateJob.state.collect { result -> onUpdateWifiState(result) } }
+            launch {
+                updateLocationJob.state.collect { result -> onUpdateLocation(result) }
+            }
+            launch {
+                updateWifiStateJob.state.collect { result -> onUpdateWifiState(result) }
+            }
         }
     }
 
@@ -59,7 +69,35 @@ class MockLocationService : LifecycleService() {
         super.onCreate()
 
         serviceNotification.makeForegroundService(this)
+
+        val context = this
+        lifecycleScope.launchWhenCreated {
+            val gaa = GoogleApiAvailability.getInstance()
+            while (isActive) {
+                val r = gaa.isGooglePlayServicesAvailable(context)
+                if (r == ConnectionResult.SERVICE_UPDATING) {
+                    // waiting for updating
+                    delay(10 * 1000)
+                    continue
+                }
+                if (r == ConnectionResult.SUCCESS) {
+                    locationClient = LocationServices.getFusedLocationProviderClient(context)
+                    gaa
+                        .checkApiAvailability(locationClient)
+                        .addOnSuccessListener {
+                            isAvailableLocationClient = true
+                        }
+                } else {
+                    // not available
+                }
+                break
+            }
+        }
     }
+
+
+
+
 
 
     override fun onDestroy() {
@@ -76,9 +114,14 @@ class MockLocationService : LifecycleService() {
 
         serviceNotification.disposeNotification(this)
 
-        val locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        val locationManager = getSystemService(Context.LOCATION_SERVICE) as? LocationManager
         if (locationManager != null) {
-            mockLocation.clear(locationManager)
+            mockLocation.exitMockMode(locationManager)
+        }
+
+        if (isAvailableLocationClient) {
+            isAvailableLocationClient = false
+            mockLocation.exitMockMode(locationClient)
         }
     }
 
@@ -138,6 +181,11 @@ class MockLocationService : LifecycleService() {
     }
 
 
+    fun onNotRegisteredMockLocationApp() {
+        val s = getString(R.string.toast_need_set_mocklocation_app)
+        serviceNotification.updateNotification_StopService(this, s)
+    }
+
     fun onUpdateLocation(r: LocationUpdateJob.Result?) {
         if (isReadyUpdateNotification == false) {
             return
@@ -147,20 +195,38 @@ class MockLocationService : LifecycleService() {
         }
 
         println("update mock location: ${r.l}")
-        val locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        val locationManager = getSystemService(Context.LOCATION_SERVICE) as? LocationManager
         if (locationManager != null) {
             try {
                 mockLocation.set(r.l, locationManager)
             }
             catch (e: SecurityException) {
-                val s = getString(R.string.toast_need_set_mocklocation_app)
-                serviceNotification.updateNotification_StopService(this, s)
+                onNotRegisteredMockLocationApp()
                 return
             }
-
-            val text = getNotificationText()
-            serviceNotification.updateNotification_StopService(this, text)
         }
+
+        if (isAvailableLocationClient) {
+            val t = mockLocation.tryEnterMockMode(locationClient)
+            if (t == null) {
+                onNotRegisteredMockLocationApp()
+                return
+            }
+            t.continueWith {
+                if (it.isSuccessful) {
+                    if (isReadyUpdateNotification) {
+                        val tasks = mockLocation.trySet(r.l, locationClient)
+                        if (tasks == null) {
+                            onNotRegisteredMockLocationApp()
+                        }
+                        // TODO error handling of each tasks
+                    }
+                }
+            }
+        }
+
+        val text = getNotificationText()
+        serviceNotification.updateNotification_StopService(this, text)
     }
 
     private fun onUpdateWifiState(r: WifiStateUpdateJob.Result?) {
