@@ -14,25 +14,35 @@ class MockLocationSetter(
     val providersForFusedLocationProviderClient: List<String>
 ) {
 
+
     fun set(l: Location, locationManager: LocationManager) {
         for (p in providersForLocationManager) {
             val l2 = Location(l)
             l2.provider = p
 
-            locationManager.addTestProvider(
-                p,
-                false,
-                false,
-                false,
-                false,
-                false,
-                true,
-                false,
-                Criteria.POWER_LOW,
-                Criteria.ACCURACY_FINE
-            )
-            locationManager.setTestProviderEnabled(p, true)
-            locationManager.setTestProviderLocation(p, l2)
+            // HACK: android 10 の場合: addTestProvider は同じ名前の provider が既に追加されていた場合に例外を投げる
+            //      ドキュメントには "同じ名前の provider は置き換える" とあるのでバグなのでは.
+            try {
+                locationManager.setTestProviderEnabled(p, true)
+                locationManager.setTestProviderLocation(p, l2)
+            }
+            catch (e: IllegalArgumentException) {
+                // provider が追加されていない
+                locationManager.addTestProvider(
+                    p,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    true,
+                    false,
+                    Criteria.POWER_LOW,
+                    Criteria.ACCURACY_FINE
+                )
+                locationManager.setTestProviderEnabled(p, true)
+                locationManager.setTestProviderLocation(p, l2)
+            }
         }
     }
 
