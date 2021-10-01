@@ -26,6 +26,7 @@ class MainActivity : AppCompatActivity() {
 
     lateinit var requestPermissionLauncher: ActivityResultLauncher<String?>
 
+    var alertDialog: AlertDialog? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -43,6 +44,11 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+
+        alertDialog?.let {
+            it.dismiss()
+            alertDialog = null
+        }
 
         checkLocationPermission()
     }
@@ -73,7 +79,9 @@ class MainActivity : AppCompatActivity() {
                     startActivity(intent)
                 }
                 .create()
-                .show()
+            alert.show()
+
+            alertDialog = alert
             return
         }
 

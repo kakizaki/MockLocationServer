@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.location.LocationManager
 import android.os.Build
+import android.os.Looper
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -15,8 +16,7 @@ import com.example.mocklocationserver.web.mocklocation.MockLocationSetter
 import com.example.mocklocationserver.web.mocklocation.MockLocationUtility
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.GoogleApiAvailability
-import com.google.android.gms.location.FusedLocationProviderClient
-import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collect
 import java.sql.Date
@@ -35,6 +35,16 @@ class MockLocationService : LifecycleService() {
 
     private lateinit var locationClient: FusedLocationProviderClient
     private var isAvailableLocationClient = false
+    private val locationCallback = object: LocationCallback() {
+        override fun onLocationResult(p0: LocationResult) {
+            super.onLocationResult(p0)
+        }
+
+        override fun onLocationAvailability(p0: LocationAvailability) {
+            super.onLocationAvailability(p0)
+        }
+    }
+
 
     private var updateLocationJob = LocationUpdateJob()
 
@@ -70,35 +80,8 @@ class MockLocationService : LifecycleService() {
 
         serviceNotification.makeForegroundService(this)
 
-        val context = this
-        lifecycleScope.launchWhenCreated {
-            val gaa = GoogleApiAvailability.getInstance()
-            while (isActive) {
-                val r = gaa.isGooglePlayServicesAvailable(context)
-                if (r == ConnectionResult.SERVICE_UPDATING) {
-                    // waiting for updating
-                    delay(10 * 1000)
-                    continue
-                }
-                if (r == ConnectionResult.SUCCESS) {
-                    locationClient = LocationServices.getFusedLocationProviderClient(context)
-                    gaa
-                        .checkApiAvailability(locationClient)
-                        .addOnSuccessListener {
-                            isAvailableLocationClient = true
-                        }
-                } else {
-                    // not available
-                }
-                break
-            }
-        }
+        registerFusedLocationProviderClient()
     }
-
-
-
-
-
 
     override fun onDestroy() {
         super.onDestroy()
@@ -122,8 +105,64 @@ class MockLocationService : LifecycleService() {
         if (isAvailableLocationClient) {
             isAvailableLocationClient = false
             mockLocation.exitMockMode(locationClient)
+            unregisterLocationRequest()
         }
     }
+
+
+
+    fun registerFusedLocationProviderClient() {
+        val context = this
+        val looper = Looper.getMainLooper()
+
+        lifecycleScope.launchWhenCreated {
+            val gaa = GoogleApiAvailability.getInstance()
+            while (isActive) {
+                val r = gaa.isGooglePlayServicesAvailable(context)
+                if (r == ConnectionResult.SERVICE_UPDATING) {
+                    // waiting for updating
+                    delay(10 * 1000)
+                    continue
+                }
+
+                if (r == ConnectionResult.SUCCESS) {
+                    val client = LocationServices.getFusedLocationProviderClient(context)
+                    gaa.checkApiAvailability(client).addOnSuccessListener {
+                        locationClient = client
+                        isAvailableLocationClient = true
+
+                        // 5 分程度 LocationClient の呼び出しをしない場合、接続が切れる
+                        // 接続が切れることで setMockMode が解除される
+                        // 接続を維持するため requestLocationUpdates を行う
+                        val request = LocationRequest.create()
+                        request.priority = LocationRequest.PRIORITY_NO_POWER
+
+                        // パーミッションはアクティビティで確認されている
+                        try {
+                            locationClient.requestLocationUpdates(request, locationCallback, looper)
+                        }
+                        catch (e: SecurityException) {
+
+                        }
+                    }
+                } else {
+                    // not available
+                }
+                break
+            }
+        }
+    }
+
+
+    fun unregisterLocationRequest() {
+        if (isAvailableLocationClient) {
+            locationClient?.let {
+                it.removeLocationUpdates(locationCallback)
+            }
+        }
+    }
+
+
 
 
 //    override fun onBind(intent: Intent): IBinder {
