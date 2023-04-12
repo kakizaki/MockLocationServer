@@ -1,32 +1,25 @@
 package com.example.mocklocationserver.web
 
 import android.Manifest
-import android.content.DialogInterface
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.provider.Settings
-import android.widget.Toast
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
-import androidx.core.content.ContextCompat
+import androidx.appcompat.app.AppCompatActivity
 import com.example.mocklocationserver.web.databinding.ActivityMainBinding
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.launch
+import com.example.mocklocationserver.web.service.MockLocationService
 
 class MainActivity : AppCompatActivity() {
 
-    lateinit var binding: ActivityMainBinding
+    private lateinit var binding: ActivityMainBinding
 
-    lateinit var requestPermissionLauncher: ActivityResultLauncher<String?>
+    private lateinit var requestPermissionLauncher: ActivityResultLauncher<String?>
 
-    var alertDialog: AlertDialog? = null
+    private var alertDialog: AlertDialog? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -36,9 +29,10 @@ class MainActivity : AppCompatActivity() {
         binding.startService.setOnClickListener { startWebServer() }
         binding.stopService.setOnClickListener { stopWebServer() }
 
-        requestPermissionLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
-            onCheckLocationPermission(isGranted)
-        }
+        requestPermissionLauncher =
+            registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
+                onCheckLocationPermission(isGranted)
+            }
     }
 
 
@@ -53,7 +47,7 @@ class MainActivity : AppCompatActivity() {
         checkLocationPermission()
     }
 
-    fun checkLocationPermission() {
+    private fun checkLocationPermission() {
         if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
             onCheckLocationPermission(true)
         } else {
@@ -61,7 +55,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    fun onCheckLocationPermission(isGranted: Boolean) {
+    private fun onCheckLocationPermission(isGranted: Boolean) {
         if (isGranted) {
             // 現状、とくにすることがない
             return
@@ -89,13 +83,13 @@ class MainActivity : AppCompatActivity() {
     }
 
 
-    fun startWebServer() {
+    private fun startWebServer() {
         val i = Intent(this, MockLocationService::class.java)
         startService(i)
     }
 
 
-    fun stopWebServer() {
+    private fun stopWebServer() {
         val i = Intent(this, MockLocationService::class.java)
         stopService(i)
     }

@@ -1,8 +1,6 @@
 package com.example.mocklocationserver.web.dto
 
-import java.util.*
-
-data class FakeLocation(
+data class LocationRequest(
     val latitude: Double,
     val longitude: Double,
     val altitude: Double,

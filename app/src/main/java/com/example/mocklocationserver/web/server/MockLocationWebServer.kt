@@ -1,39 +1,27 @@
-package com.example.mocklocationserver.web
+package com.example.mocklocationserver.web.server
 
 import android.content.Context
-import com.example.mocklocationserver.web.dto.FakeLocation
+import com.example.mocklocationserver.web.data.InMemoryLocationRequestRepository
+import com.example.mocklocationserver.web.dto.LocationRequest
 import com.example.mocklocationserver.web.dto.LocationJsonFields
-import com.example.mocklocationserver.web.dto.RequestFakeLocation
 import fi.iki.elonen.NanoHTTPD
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.launch
 import org.json.JSONException
 import org.json.JSONObject
-import java.security.KeyStore
 import java.util.*
-import javax.net.ssl.KeyManagerFactory
+
 
 /**
  * Web サーバー
  * web api のハンドル
  * assets/html ディレクトリにあるファイルを返す
  */
-class MockLocationWebServer(private val context: Context, val port: Int, private val scope: CoroutineScope) : NanoHTTPD(port) {
+class MockLocationWebServer(
+    port: Int,
+    private val context: Context,
+    private val repository: InMemoryLocationRequestRepository
+) : NanoHTTPD(port) {
 
-    private val lockObject = Object()
-
-    private var requestFakeLocation: RequestFakeLocation? =  null
-
-    private val _state = MutableStateFlow<RequestFakeLocation?>(null)
-    val state: StateFlow<RequestFakeLocation?> = _state;
-
-
-    init {
-
+//    init {
         // for https://
 //        val keystore = KeyStore.getInstance(KeyStore.getDefaultType())
 //        val stream = context.assets.open("keystore.bks")
@@ -43,18 +31,13 @@ class MockLocationWebServer(private val context: Context, val port: Int, private
 //        factory.init(keystore, "password".toCharArray())
 //
 //        makeSecure(NanoHTTPD.makeSSLSocketFactory(keystore, factory), null)
+//    }
 
-    }
-
-
-    override fun stop() {
-        super.stop()
-    }
 
     override fun serve(session: IHTTPSession?): Response {
         session?.let {
             // web api として処理する
-            handleWebAPI(it)?.let { return it }
+            handleWebAPI(it)?.let { response -> return response }
 
             // web api でなければ、assets/htmlディレクトリにあるファイルを返す
             val filepath = if (it.uri == "/") "html/index.html" else "html${it.uri}"
@@ -67,7 +50,7 @@ class MockLocationWebServer(private val context: Context, val port: Int, private
                 // とりあえず拡張子があるファイルのみ
                 if (0 <= i) {
                     // 拡張子から mimetype を作成
-                    val mime = when (filepath.substring(i + 1).toLowerCase(Locale.getDefault())) {
+                    val mime = when (filepath.substring(i + 1).lowercase(Locale.getDefault())) {
                         "html", "htm" -> "text/html"
                         "js" -> "text/javascript"
                         "css" -> "text/css"
@@ -79,16 +62,15 @@ class MockLocationWebServer(private val context: Context, val port: Int, private
                         return newChunkedResponse(Response.Status.OK, mime, f)
                     }
                 }
-            }
-            catch (e: Exception) {
-                println("${e}")
+            } catch (e: Exception) {
+                println("$e")
             }
 
             return newFixedLengthResponse(
                 Response.Status.NOT_FOUND,
                 "text/plain",
                 it.uri
-            );
+            )
         }
 
         return super.serve(session)
@@ -108,8 +90,7 @@ class MockLocationWebServer(private val context: Context, val port: Int, private
                     try {
                         h.parseBody(body)
                         return onLocationRequest(body)
-                    }
-                    catch (e: Exception) {
+                    } catch (e: Exception) {
                     }
 
                     // TODO http status code
@@ -131,15 +112,13 @@ class MockLocationWebServer(private val context: Context, val port: Int, private
     private fun onLocationRequest(body: MutableMap<String, String>): Response {
         body["postData"]?.let {
             val l = parseToFakeLocation(it)
-            if (l != null) {
-                if (l.hasNaN() == false) {
-                    setLocation(l)
-                    return newFixedLengthResponse(
-                        Response.Status.OK,
-                        "text",
-                        ""
-                    )
-                }
+            if (l?.hasNaN() == false) {
+                setLocation(l)
+                return newFixedLengthResponse(
+                    Response.Status.OK,
+                    "text",
+                    ""
+                )
             }
         }
 
@@ -155,37 +134,12 @@ class MockLocationWebServer(private val context: Context, val port: Int, private
     }
 
 
-    private fun setLocation(l: FakeLocation) {
+    private fun setLocation(l: LocationRequest) {
         // HACK StateFlow.emit すればいいのでは。古いものは残していないし。
         println("setLocation: $l")
-        val d = Date()
-        synchronized(lockObject)  {
-            requestFakeLocation = RequestFakeLocation(d, l)
-        }
-
-        scope.launch(Dispatchers.Default) {
-            _state.emit(RequestFakeLocation(d, l))
-        }
+        repository.update(l)
     }
 
-
-    fun getLocation(): RequestFakeLocation? {
-        synchronized(lockObject) {
-            return requestFakeLocation?.copy()
-        }
-    }
-
-
-    /**
-     * 新しい位置情報を受信するまで待機する
-     */
-    fun waitChannel(date: Date?) {
-        synchronized(lockObject) {
-            if (date != requestFakeLocation?.date) {
-                return
-            }
-        }
-    }
 
 
     companion object {
@@ -194,56 +148,53 @@ class MockLocationWebServer(private val context: Context, val port: Int, private
          * キーが存在する場合に optDouble を実行する
          * キーが存在しない場合は valueWhenNotContains を返す
          */
-        fun JSONObject.optDoubleWhenContains(s: String, valueWhenNotContains: Double): Double {
-            if (this.has(s))
-                return this.optDouble(s)
+        private fun JSONObject.optDoubleWhenContains(s: String, valueWhenNotContains: Double): Double {
+            return if (this.has(s))
+                this.optDouble(s)
             else
-                return valueWhenNotContains
+                valueWhenNotContains
         }
 
-        fun JSONObject.optBooleanWhenContains(s: String, valueWhenNotContains: Boolean): Boolean {
-            if (this.has(s))
-                return this.optBoolean(s)
+        private fun JSONObject.optBooleanWhenContains(s: String, valueWhenNotContains: Boolean): Boolean {
+            return if (this.has(s))
+                this.optBoolean(s)
             else
-                return valueWhenNotContains
+                valueWhenNotContains
         }
 
         /**
          * JSON 文字列を FakeLocation へ変換する
          */
-        fun parseToFakeLocation(json: String?): FakeLocation? {
+        fun parseToFakeLocation(json: String?): LocationRequest? {
             if (json == null) {
                 return null
             }
 
             try {
                 val o = JSONObject(json)
-                val lat = o.optDouble(LocationJsonFields.lat.prop)
-                val lng = o.optDouble(LocationJsonFields.lng.prop)
+                val lat = o.optDouble(LocationJsonFields.Lat.prop)
+                val lng = o.optDouble(LocationJsonFields.Lng.prop)
 
                 // 以下は、フィールドがない場合は0にする (緯度、経度が指定されていれば良い)
-                val alt = o.optDoubleWhenContains(LocationJsonFields.alt.prop, 0.0)
-                val hacc = o.optDoubleWhenContains(LocationJsonFields.hacc.prop, 0.0)
-                val repeatedly = o.optBooleanWhenContains(LocationJsonFields.repeatedlyUpdate.prop, false)
-                val velocity = o.optDoubleWhenContains(LocationJsonFields.velocity.prop, 0.0)
+                val alt= o.optDoubleWhenContains(LocationJsonFields.Altitude.prop, 0.0)
+                val hAcc= o.optDoubleWhenContains(LocationJsonFields.HAccuracy.prop, 0.0)
+                val repeatedly =
+                    o.optBooleanWhenContains(LocationJsonFields.RepeatedlyUpdate.prop, false)
+                val velocity = o.optDoubleWhenContains(LocationJsonFields.Velocity.prop, 0.0)
 
-                val l = FakeLocation(
+                return LocationRequest(
                     lat,
                     lng,
                     alt,
-                    hacc,
+                    hAcc,
                     repeatedly,
                     velocity
                 )
-
-                return l
-            }
-            catch (e: JSONException) {
+            } catch (e: JSONException) {
                 println("json parse error: $e")
             }
             return null
         }
-
     }
 }
 

@@ -13,18 +13,17 @@ class MockLocationUtility {
         /**
          * 仮の位置情報をセットするアプリケーションとして設定されているか
          */
-        fun isEnabledMockLocationApp(c: Context): Boolean {
+        fun isEnabledMockLocationApp(context: Context): Boolean {
             try {
                 val r = AppOpsManagerCompat.noteOp(
-                    c,
+                    context,
                     AppOpsManager.OPSTR_MOCK_LOCATION,
                     Process.myUid(),
-                    c.packageName
+                    context.packageName
                 )
                 return r == AppOpsManager.MODE_ALLOWED
             }
-            catch (e: SecurityException) {
-                return false
+            catch (_: SecurityException) {
             }
             return false
         }
@@ -32,12 +31,11 @@ class MockLocationUtility {
         /**
          * 開発者設定を表示する
          */
-        fun goApplicationDevelopmentSettings(c: Context) {
-            c.startActivity(
-                Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)
-                    .apply {
+        fun goApplicationDevelopmentSettings(context: Context) {
+            val intent = Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            })
+            }
+            context.startActivity(intent)
         }
 
     }
