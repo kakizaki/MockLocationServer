@@ -12,6 +12,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.example.mocklocationserver.web.MainActivity
 import com.example.mocklocationserver.web.R
+import com.example.mocklocationserver.web.mocklocation.MockLocationUtility
 
 /**
  * android への通知
@@ -66,7 +67,6 @@ class MockLocationServiceNotification {
         val notification = NotificationCompat.Builder(c, CHANNEL_ID)
             .setContentTitle(s.getString(R.string.notification_channel_name))
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentText("aaa")
             .setContentIntent(contentIntent)
             .build()
 
@@ -87,9 +87,13 @@ class MockLocationServiceNotification {
      * 通知の更新
      */
     @SuppressLint("MissingPermission")
-    fun updateNotification(c: Context, text: String) {
-        val contentIntent = Intent(c, MainActivity::class.java).let {
-            PendingIntent.getActivity(c, 0, it, PendingIntent.FLAG_IMMUTABLE)
+    fun updateNotification(c: Context, text: String, customContentIntent: PendingIntent? = null) {
+        val contentIntent = if (customContentIntent != null) {
+            customContentIntent
+        } else {
+            Intent(c, MainActivity::class.java).let {
+                PendingIntent.getActivity(c, 0, it, PendingIntent.FLAG_IMMUTABLE)
+            }
         }
 
         val actionStop = Intent(c, MockLocationService::class.java).apply {
@@ -109,6 +113,7 @@ class MockLocationServiceNotification {
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentText(text)
             .setContentIntent(contentIntent)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .addAction(actionStop)
             .build()
 

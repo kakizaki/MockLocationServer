@@ -22,8 +22,7 @@ class MockLocationUtility {
                     context.packageName
                 )
                 return r == AppOpsManager.MODE_ALLOWED
-            }
-            catch (_: SecurityException) {
+            } catch (_: SecurityException) {
             }
             return false
         }
@@ -32,12 +31,15 @@ class MockLocationUtility {
          * 開発者設定を表示する
          */
         fun goApplicationDevelopmentSettings(context: Context) {
-            val intent = Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
+            val intent = createApplicationDevelopmentSettings()
             context.startActivity(intent)
         }
 
+        fun createApplicationDevelopmentSettings(): Intent {
+            return Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+        }
     }
 
 }
