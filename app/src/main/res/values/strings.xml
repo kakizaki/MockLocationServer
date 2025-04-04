@@ -7,12 +7,20 @@
 + 「位置情報」 … WiFi の情報を取得するために使用します\n
     </string>
 
-    <string name="toast_need_developer_mode">開発者向けオプションを有効にして、仮の現在地情報アプリに設定してください</string>
-    <string name="toast_need_set_mocklocation_app">仮の現在地情報アプリに設定してください</string>
+    <string name="button_yes">はい</string>
+    <string name="button_no">いいえ</string>
+
+    <string name="dialog_not_set_mocklocation_app">仮の現在地情報アプリに設定されていません</string>
+    <string name="dialog_show_development_options">開発者向けオプションにて、このアプリを仮の現在地情報アプリに設定してください。\n\n開発者向けオプションを表示します</string>
+
     <string name="toast_failed_start_webserver">Webサーバーの起動に失敗しました</string>
 
     <string name="notification_channel_name">サービス実行中</string>
     <string name="notification_stop_service">サービスを終了する</string>
 
+    <string name="notification_enter_mockmode_start">仮の位置情報を開始しています</string>
+    <string name="notification_enter_mockmode_faulted">仮の位置情報の開始に失敗しました (数秒後に再試行)</string>
+    <string name="notification_need_set_mocklocation_app">仮の現在地情報アプリに設定してください</string>
+    <string name="notification_need_location_permission">位置情報の権限がありません</string>
 
 </resources>
