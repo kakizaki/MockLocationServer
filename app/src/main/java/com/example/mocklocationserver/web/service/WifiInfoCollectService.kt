@@ -64,7 +64,7 @@ class WifiInfoCollectService @Inject constructor(
 
             val info = try {
                 wifiManager.connectionInfo
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 null
             }
 

@@ -75,7 +75,7 @@ class LocationManagerMock(
         for (p in providers) {
             try {
                 locationManager.removeTestProvider(p)
-            } catch (e: IllegalArgumentException) {
+            } catch (_: IllegalArgumentException) {
                 // もともと追加されていないので気にしない
             }
         }

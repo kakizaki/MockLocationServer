@@ -3,9 +3,9 @@ package com.example.mocklocationserver.web.service
 import android.location.Location
 import com.example.mocklocationserver.web.data.InMemoryLocationRequestRepository
 import com.example.mocklocationserver.web.dto.LocationRequest
-import com.google.android.gms.location.*
-import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.transformLatest
 import kotlin.time.Duration.Companion.seconds
 
 

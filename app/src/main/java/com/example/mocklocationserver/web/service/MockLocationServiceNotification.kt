@@ -12,7 +12,6 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.example.mocklocationserver.web.MainActivity
 import com.example.mocklocationserver.web.R
-import com.example.mocklocationserver.web.mocklocation.MockLocationUtility
 
 /**
  * android への通知

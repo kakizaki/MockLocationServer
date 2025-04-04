@@ -90,7 +90,7 @@ class MockLocationWebServer(
                     try {
                         h.parseBody(body)
                         return onLocationRequest(body)
-                    } catch (e: Exception) {
+                    } catch (_: Exception) {
                     }
 
                     // TODO http status code

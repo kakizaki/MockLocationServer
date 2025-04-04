@@ -108,7 +108,7 @@ class MockLocationInjector(
                     try {
                         fusedLocationProviderMock.enterMockMode().awaitTask()
                         State.SUCCESS_ENTER_MOCK_MODE
-                    } catch (e: Exception) {
+                    } catch (_: Exception) {
                         State.SUCCESS_ENTER_MOCK_MODE_ONLY_LOCATION_MANAGER
                     }
                 } else {
@@ -150,11 +150,11 @@ class MockLocationInjector(
 
         try {
             locationManagerMock.exitMockMode()
-        } catch (e: SecurityException) {
+        } catch (_: SecurityException) {
         }
         try {
             fusedLocationProviderMock.exitMockMode()
-        } catch (e: SecurityException) {
+        } catch (_: SecurityException) {
         }
     }
 
@@ -173,7 +173,7 @@ class MockLocationInjector(
                 }
             }
             return true
-        } catch (e: SecurityException) {
+        } catch (_: SecurityException) {
             _notifyState.value = State.TRY_ENTER_MOCK_MODE
             return false
         }

@@ -21,6 +21,7 @@ import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -40,7 +41,7 @@ class MockLocationService : LifecycleService() {
     companion object {
         const val TAG = "MockLocationService"
 
-        private val WEB_SERVER_PORT_NUMBER = 8080
+        const val WEB_SERVER_PORT_NUMBER = 8080
     }
 
     private val serviceNotification = MockLocationServiceNotification()
@@ -120,7 +121,7 @@ class MockLocationService : LifecycleService() {
         super.onDestroy()
         println("onDestroy")
 
-        webServer?.stop()
+        webServer.stop()
 
         serviceNotification.disposeNotification(this)
 
@@ -131,7 +132,6 @@ class MockLocationService : LifecycleService() {
 
 
     private fun registerFusedLocationProviderClient() {
-        val context = this
         val looper = Looper.getMainLooper()
 
         lifecycleScope.launch {
@@ -141,14 +141,14 @@ class MockLocationService : LifecycleService() {
                         // 5 分程度 LocationClient の呼び出しをしない場合、接続が切れる
                         // 接続が切れることで setMockMode が解除される
                         // 接続を維持するため requestLocationUpdates を行う
-                        val request = LocationRequest.create()
-                        request.priority = LocationRequest.PRIORITY_NO_POWER
+                        val request = LocationRequest.Builder(Priority.PRIORITY_LOW_POWER, 5000)
+                            .build()
 
                         mockLocationInjector.fusedLocationProviderClient.requestLocationUpdates(
                             request, locationCallback, looper
                         ).awaitTask()
                         break
-                    } catch (e: SecurityException) {
+                    } catch (_: SecurityException) {
                     }
                 }
 
@@ -189,7 +189,7 @@ class MockLocationService : LifecycleService() {
             if (webServer.wasStarted() == false) {
                 webServer.start()
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             Toast.makeText(
                 this, R.string.toast_failed_start_webserver, Toast.LENGTH_LONG
             ).show()
@@ -200,7 +200,7 @@ class MockLocationService : LifecycleService() {
 
 
     private fun updateFakeLocation(location: Location) {
-        println("update mock location: ${location}")
+        println("update mock location: $location")
 
         if (mockLocationInjector.setLocation(location)) {
             locationInfo = toLocationInfoString(location)
@@ -269,7 +269,7 @@ class MockLocationService : LifecycleService() {
             return "wifi is Disconnected."
         }
 
-        val ip = info.info.ipAddress ?: 0
+        val ip = info.info.ipAddress
         if (ip == 0) {
             return "wifi is Disconnected."
         }
