@@ -39,6 +39,14 @@ HTTP リクエストに指定された位置情報を仮の現在置情報とし
 ## サービスの終了
 サービスの終了時には仮の現在地情報は削除されます。実際のセンサーが取得している位置情報を使用します。
 
+## 
+
+![image](https://github.com/user-attachments/assets/01d51d37-4e52-4dfc-bcde-37eb64812512)
+
+![image](https://github.com/user-attachments/assets/c70a58bd-480a-4dd8-9343-127a7f3e7e02)
+
+
+
 
 # web サーバー
 
